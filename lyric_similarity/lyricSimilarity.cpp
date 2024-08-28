@@ -6,13 +6,68 @@
 #include <set>
 #include <vector>
 #include <map>
-#include <boost/tokenizer.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/foreach.hpp>
+#include <unordered_set>
+#include <algorithm>
+#include <cassert>
+#include <iterator>
+#include <cmath>
 
 using namespace std;
+using Token = std::unordered_set<char>;
 
+// https://stackoverflow.com/a/14617481
+// http://www.joshbarczak.com/blog/?p=970
+struct Tokenize {
+  public:
+    Tokenize(std::vector<std::string> & output, const Token & t) :
+      v_(output), t_(t) {}
+    ~Tokenize()
+    {
+      if (!s.empty())
+      {
+        v_.push_back(s);
+      }
+    }
+    void operator()(const char & c) {
+      if (t_.find(c) != t_.end())
+      {
+        if (!s.empty())
+        {
+          v_.push_back(s);
+        }
+        s.clear();
+      }
+      else
+      {
+        s.append(1, c);
+      }
+    }
+  private:
+    std::string s;
+    std::vector<std::string> & v_;
+    const Token & t_;
+};
+// https://stackoverflow.com/a/65075284
+std::vector<std::string> split(std::string text, std::string delim) {
+  std::vector<std::string> vec;
+  size_t pos = 0, prevPos = 0;
+  while (1) {
+      pos = text.find(delim, prevPos);
+      if (pos == std::string::npos) {
+          vec.push_back(text.substr(prevPos));
+          return vec;
+      }
+
+      vec.push_back(text.substr(prevPos, pos - prevPos));
+      prevPos = pos + delim.length();
+  }
+}
+// https://stackoverflow.com/a/5689061 + https://stackoverflow.com/a/18427254
+std::string join(const std::vector<std::string> & vec, const char *delim = ", ") {
+  std::stringstream res;
+  std::copy(vec.begin(), vec.end(), std::ostream_iterator<std::string>(res, delim));
+  return res.str();
+}
 class tfidf {
 
 private:
@@ -78,16 +133,59 @@ private:
 		nrow = dataMat.size();
 		rawDataSet.clear(); // release memory
 	}
-
+  // https://stackoverflow.com/a/14617481
+  // http://www.joshbarczak.com/blog/?p=970
+  struct Tokenize {
+    public:
+      Tokenize(std::vector<std::string> & output, const Token & t) :
+        v_(output), t_(t) {}
+      ~Tokenize()
+      {
+        if (!s.empty())
+        {
+          v_.push_back(s);
+        }
+      }
+      void operator()(const char & c) {
+        if (t_.find(c) != t_.end())
+        {
+          if (!s.empty())
+          {
+            v_.push_back(s);
+          }
+          s.clear();
+        }
+        else
+        {
+          s.append(1, c);
+        }
+      }
+    private:
+      std::string s;
+      std::vector<std::string> & v_;
+      const Token & t_;
+  };
 	std::vector<std::string> textParse(std::string & bigString)
 	{
 		std::vector<std::string> vec;
-		boost::tokenizer<> tok(bigString);
-		for(boost::tokenizer<>::iterator beg = tok.begin(); beg != tok.end(); ++ beg)
+		std::vector<std::string> tokens;
+    Token t;
+    t.insert(' ');
+    t.insert('\n');
+    t.insert('\t');
+    t.insert('\r');
+    t.insert('\f');
+		Tokenize tok(tokens, t);
+		for(auto c : bigString)
 		{
-		    if (!(std::binary_search(stopWrods.begin(), stopWrods.end(), *beg)))
-		    	vec.push_back(*beg);
+		    tok(c);
 		}
+		for(auto token : tokens)
+		{
+		    if (!(std::binary_search(stopWrods.begin(), stopWrods.end(), token)))
+		    	vec.push_back(token);
+		}
+    tokens.clear();
 		return vec;
 	}
 
@@ -147,7 +245,7 @@ public:
 				break;
 			getline(in, tmp, '\n');
 			if (tmp == "") break;
-			boost::split(vec_str, tmp, boost::is_any_of(","));
+			vec_str = split(tmp, ",");
 			std::vector<std::string> wordList = textParse(vec_str[1]);
 			rawDataSet.push_back(wordList);
 			tracks.push_back(vec_str[0]);
@@ -160,7 +258,7 @@ public:
 		{
 			getline(in2, tmp, '\n');
 			if (tmp == "") break;
-			boost::split(vec_str,tmp,boost::is_any_of(","));
+			vec_str = split(tmp, ",");
 			h_hot[vec_str[0]] = atoi(vec_str[1].c_str());
 			tmp.clear();
 			vec_str.clear();
@@ -270,7 +368,7 @@ public:
 					std::vector<std::string> recSong2(recSong.begin(), recSong.begin() + recAmount);
 					std::ofstream outfile;
 					outfile.open("simi_songs_lyrics", std::ios_base::app);
-					outfile << tracks[i] << "," << boost::join(recSong2, ",") << endl;
+					outfile << tracks[i] << "," << join(recSong2, ",") << endl;
 					outfile.close();
 					recSong2.clear();
 				}

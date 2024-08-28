@@ -1,10 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <set>
-#include <boost/tokenizer.hpp>
+#include <unordered_set>
 #include <sstream>
 
 using namespace std;
+
+using Token = std::unordered_set<char>;
 
 class tfidf {
 private:
@@ -127,14 +129,52 @@ namespace file_related
 			            std::istreambuf_iterator<char>());
 		return str;
 	}
+  // https://stackoverflow.com/a/14617481
+  // http://www.joshbarczak.com/blog/?p=970
+  struct Tokenize {
+    public:
+      Tokenize(std::vector<std::string> & output, const Token & t) :
+        v_(output), t_(t) {}
+      ~Tokenize()
+      {
+        if (!s.empty())
+        {
+          v_.push_back(s);
+        }
+      }
+      void operator()(const char & c) {
+        if (t_.find(c) != t_.end())
+        {
+          if (!s.empty())
+          {
+            v_.push_back(s);
+          }
+          s.clear();
+        }
+        else
+        {
+          s.append(1, c);
+        }
+      }
+    private:
+      std::string s;
+      std::vector<std::string> & v_;
+      const Token & t_;
+  };
 
 	std::vector<std::string> textParse(const std::string & bigString)
 	{
 		std::vector<std::string> vec;
-		boost::tokenizer<> tok(bigString);
-		for(boost::tokenizer<>::iterator beg = tok.begin(); beg != tok.end(); ++ beg)
+    Token t;
+    t.insert(' ');
+    t.insert('\n');
+    t.insert('\t');
+    t.insert('\r');
+    t.insert('\f');
+		Tokenize tok(vec, t);
+		for(auto c : bigString)
 		{
-		    vec.push_back(*beg);
+		    tok(c);
 		}
 		return vec;
 	}
